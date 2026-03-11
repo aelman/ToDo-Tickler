@@ -2,31 +2,23 @@
 //  ToDo_TicklerApp.swift
 //  ToDo Tickler
 //
-//  Created by Adam Elman on 3/2/26.
-//
 
 import SwiftUI
-import SwiftData
 
 @main
 struct ToDo_TicklerApp: App {
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Item.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }()
+    @State private var reminderStore = ReminderStore()
+    @State private var locationManager = LocationManager()
 
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environment(reminderStore)
+                .environment(locationManager)
+                .task {
+                    await reminderStore.requestAccess()
+                    locationManager.startUpdating()
+                }
         }
-        .modelContainer(sharedModelContainer)
     }
 }

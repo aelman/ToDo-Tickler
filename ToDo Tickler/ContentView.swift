@@ -2,65 +2,64 @@
 //  ContentView.swift
 //  ToDo Tickler
 //
-//  Created by Adam Elman on 3/2/26.
-//
 
+import EventKit
 import SwiftUI
-import SwiftData
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
+    @Environment(ReminderStore.self) private var store
 
     var body: some View {
-        NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
-                    }
-                }
-                .onDelete(perform: deleteItems)
+        Group {
+            switch store.authorizationStatus {
+            case .fullAccess:
+                mainTabView
+            case .notDetermined:
+                ProgressView("Requesting access to Reminders...")
+            default:
+                permissionDeniedView
             }
-#if os(macOS)
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200)
-#endif
-            .toolbar {
-#if os(iOS)
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-#endif
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
-                }
-            }
-        } detail: {
-            Text("Select an item")
         }
     }
 
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
+    private var mainTabView: some View {
+        TabView {
+            Tab("Today", systemImage: "star.fill") {
+                TodayView()
+            }
+            Tab("Available", systemImage: "tray.full") {
+                AvailableView()
+            }
+            Tab("Upcoming", systemImage: "calendar.badge.clock") {
+                UpcomingView()
+            }
+            Tab("Lists", systemImage: "list.bullet") {
+                AllRemindersView()
+            }
         }
+        #if os(iOS)
+        .tabViewStyle(.sidebarAdaptable)
+        #endif
     }
 
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
+    private var permissionDeniedView: some View {
+        ContentUnavailableView {
+            Label("Reminders Access Required", systemImage: "lock.shield")
+        } description: {
+            Text("ToDo Tickler needs access to your Reminders to display and manage your tasks. Please grant access in Settings.")
+        } actions: {
+            Button("Open Settings") {
+                #if os(iOS)
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+                #elseif os(macOS)
+                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Reminders") {
+                    NSWorkspace.shared.open(url)
+                }
+                #endif
             }
         }
     }
 }
 
-#Preview {
-    ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
-}
